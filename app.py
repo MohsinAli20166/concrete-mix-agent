@@ -1,10 +1,12 @@
 import os, json
 import streamlit as st
-from mix_design_tool import calculate_mix_design, EXPOSURE_RULES
+from mix_design_tool import calculate_mix_design, EXPOSURE_RULES, M3_TO_CFT
+
+BAG_CFT = 1.25   # site convention: 1 bag of 50 kg cement = 1.25 cft
 
 st.set_page_config(page_title="ConcreteAI", page_icon="🏗️", layout="wide")
 st.title("🏗️ ConcreteAI — Agentic ACI 211.1 Mix Design Assistant")
-st.caption("PakAngel GenAI & Agentic AI Cohort C11 · Code basis: ACI 211.1 / ACI 318 / Pakistan Building Code 2021 · Units: psi, kg/m³, cft")
+st.caption("PakAngel GenAI & Agentic AI Cohort C11 · Code basis: ACI 211.1 / ACI 318 / Pakistan Building Code 2021 · Units: psi, cft, L")
 
 lang = st.sidebar.selectbox("🌐 Language / زبان", ["English", "Urdu (اردو)", "Roman Urdu"])
 
@@ -49,19 +51,20 @@ def agent_run_llm(text, lang):
 
 def _explain(result, lang):
     ratio = result["site_ratio_per_bag"]
+    cement_cft = round(result["cement_bags_50kg"] * BAG_CFT, 1)
     if lang == "Urdu (اردو)":
         return (f"آپ کے {result['exposure']} ماحول کے لیے ایجنٹ نے {result['final_psi']} psi کنکریٹ منتخب کیا ہے۔ "
-                f"پانی-سیمنٹ تناسب {result['wc_ratio']} ہے، جس سے فی مکعب میٹر {result['cement_kg_m3']} کلو سیمنٹ "
-                f"({result['cement_bags_50kg']} بورے)، {result['sand_cft_m3']} cft ریت اور {result['coarse_agg_cft_m3']} cft کرشری ملتی ہے۔ "
+                f"پانی-سیمنٹ تناسب {result['wc_ratio']} ہے، جس سے فی مکعب میٹر {cement_cft} cft سیمنٹ، "
+                f"{result['sand_cft_m3']} cft ریت اور {result['coarse_agg_cft_m3']} cft کرشری ملتی ہے۔ "
                 f"سائٹ ریشو (فی بوری): {ratio}۔ یہ ACI 211.1 کے مطابق ابتدائی تخمینہ ہے؛ حتمی ڈیزائن کے لیے لیب ٹرائل ضروری ہے۔")
     if lang == "Roman Urdu":
         return (f"Aap ke {result['exposure']} exposure ke liye agent ne {result['final_psi']} psi concrete select kiya hai. "
-                f"Paani-cement ratio {result['wc_ratio']} hai, jis se fi cubic meter {result['cement_kg_m3']} kg cement "
-                f"({result['cement_bags_50kg']} bore), {result['sand_cft_m3']} cft ret aur {result['coarse_agg_cft_m3']} cft crush milti hai. "
+                f"Paani-cement ratio {result['wc_ratio']} hai, jis se fi cubic meter {cement_cft} cft cement, "
+                f"{result['sand_cft_m3']} cft ret aur {result['coarse_agg_cft_m3']} cft crush milti hai. "
                 f"Site ratio (fi bori): {ratio}. Ye ACI 211.1 ke mutabiq initial estimate hai; final design ke liye lab trial zaroori hai.")
     return (f"For your {result['exposure']} exposure scenario, the agent selected {result['final_psi']} psi concrete. "
-            f"The governing water-cement ratio is {result['wc_ratio']}, giving per cubic meter: {result['cement_kg_m3']} kg cement "
-            f"({result['cement_bags_50kg']} bags), {result['sand_cft_m3']} cft sand and {result['coarse_agg_cft_m3']} cft coarse aggregate. "
+            f"The governing water-cement ratio is {result['wc_ratio']}, giving per cubic meter: {cement_cft} cft cement, "
+            f"{result['sand_cft_m3']} cft sand and {result['coarse_agg_cft_m3']} cft coarse aggregate. "
             f"Site ratio per bag of cement: {ratio}. These are ACI 211.1 absolute-volume estimates for trial batches.")
 
 def agent_run_fallback(text, lang):
@@ -90,7 +93,7 @@ def show_result(args, result, explanation, mode, lang):
     elif result["warnings"] and lang == "Roman Urdu":
         st.warning("Zaroori note: code (ACI 318 / PBC 2021) ke mutabiq is exposure ke liye minimum strength lazmi hai, is liye values khud-ba-khud adjust ki gayi hain.")
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Cement / سیمنٹ", f"{result['cement_bags_50kg']} bags")
+    c1.metric("Cement / سیمنٹ", f"{round(result['cement_bags_50kg'] * BAG_CFT, 1)} cft")
     c2.metric("Sand / ریت", f"{result['sand_cft_m3']} cft")
     c3.metric("Coarse Agg / کرشری", f"{result['coarse_agg_cft_m3']} cft")
     c4.metric("Water / پانی", f"{result['water_kg_m3']} L")
@@ -103,13 +106,43 @@ def show_result(args, result, explanation, mode, lang):
 with st.sidebar:
     st.header("🧮 Manual Calculator / دستی کیلکولیٹر")
     psi = st.number_input("Target strength (psi)", 1500, 8000, 3000, step=500)
-    exp = st.selectbox("Exposure", list(EXPOSURE_RULES.keys()))
+    exp = st.selectbox("Exposure", list(EXPOSURE_RULES.keys()), key="sb_exp")
     if st.button("Calculate mix / مکس نکالیں", type="primary"):
         res = calculate_mix_design(psi, exp)
         show_result({"target_strength_psi": psi, "exposure": exp}, res,
                     _explain(res, lang), "Manual tool mode", lang)
     st.divider()
     st.caption("⚠️ Prototype for preliminary estimation & learning. Real projects require lab trial mixes and engineer sign-off.")
+
+st.header("📐 Area-wise Quantity Calculator / رقبہ کے حساب سے مقدار")
+a1, a2, a3, a4, a5 = st.columns(5)
+with a1:
+    length_ft = st.number_input("Length / لمبائی (ft)", 0.0, 1000.0, 20.0, 0.5)
+with a2:
+    width_ft = st.number_input("Width / چوڑائی (ft)", 0.0, 1000.0, 15.0, 0.5)
+with a3:
+    thick_ft = st.number_input("Thickness / موٹائی (ft)", 0.0, 10.0, 0.5, 0.25)
+with a4:
+    area_psi = st.number_input("Strength (psi)", 1500, 8000, 3000, step=500)
+with a5:
+    area_exp = st.selectbox("Exposure", list(EXPOSURE_RULES.keys()), key="area_exp")
+if st.button("Calculate total quantities / کل مقدار نکالیں", type="primary"):
+    vol_cft = length_ft * width_ft * thick_ft
+    vol_m3 = vol_cft / M3_TO_CFT
+    res = calculate_mix_design(area_psi, area_exp)
+    tot_cement_cft = res["cement_kg_m3"] * vol_m3 / 50.0 * BAG_CFT
+    tot_sand = res["sand_cft_m3"] * vol_m3
+    tot_agg = res["coarse_agg_cft_m3"] * vol_m3
+    tot_water = res["water_kg_m3"] * vol_m3
+    st.success(f"📦 Concrete volume: **{round(vol_cft, 1)} cft = {round(vol_m3, 2)} m³**")
+    for w in res["warnings"]:
+        st.error("⚠️ " + w)
+    m1, m2, m3, m4 = st.columns(4)
+    m1.metric("Total Cement / کل سیمنٹ", f"{round(tot_cement_cft, 1)} cft")
+    m2.metric("Total Sand / کل ریت", f"{round(tot_sand, 1)} cft")
+    m3.metric("Total Crush / کل کرشری", f"{round(tot_agg, 1)} cft")
+    m4.metric("Total Water / کل پانی", f"{round(tot_water, 0)} L")
+    st.caption(f"Mix used: {res['final_psi']} psi · {res['exposure']} exposure · ratio {res['site_ratio_per_bag']}")
 
 st.header("💬 Agentic Chat / ایجنٹ چیٹ")
 prompt = st.text_area("Describe your structure in plain English or Urdu-English mix:",
