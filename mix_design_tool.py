@@ -17,6 +17,44 @@ EXPOSURE_RULES = {
     "coastal":  {"min_psi": 4000, "max_wc": 0.40, "label": "Very severe / coastal & sulfate"},
 }
 
+STRUCTURE_RULES = [
+    ("coastal / marine", ["sea", "coast", "marine", "jetty"], 4500,
+     "Marine/coastal work: high chloride exposure needs a high grade with low w/c"),
+    ("water tank / sewage", ["water tank", "tank", "sewage", "drain"], 4000,
+     "Water-retaining structure: needs dense, low-permeability concrete"),
+    ("column / prestressed", ["column", "prestress", "high rise"], 4000,
+     "Main load-critical vertical member: higher grade for strength & stiffness"),
+    ("beam / slab / roof", ["beam", "slab", "roof", "deck"], 3500,
+     "RCC structural member: standard structural grade"),
+    ("retaining wall", ["retaining", "basement wall"], 3500,
+     "Earth + moisture contact: durability governs"),
+    ("road / pavement", ["road", "pavement", "parking"], 4000,
+     "Wear & abrasion exposure: higher grade surface"),
+    ("foundation / footing", ["foundation", "footing", "pile", "raft"], 3000,
+     "Substructure: minimum structural grade; soil exposure governs"),
+    ("boundary / non-structural wall", ["wall", "boundary", "compound"], 2500,
+     "Non-structural: low grade sufficient unless exposure governs"),
+    ("floor / PCC", ["pcc", "floor", "leveling"], 2500,
+     "Plain / lean concrete works"),
+]
+
+def suggest_grade(text: str, exposure: str) -> dict:
+    t = (text or "").lower()
+    for name, keys, psi, reason in STRUCTURE_RULES:
+        if any(k in t for k in keys):
+            final = psi
+            extra = ""
+            min_psi = EXPOSURE_RULES.get(exposure, EXPOSURE_RULES["mild"])["min_psi"]
+            if final < min_psi:
+                final = min_psi
+                extra = f" (raised from {psi} psi by {exposure} exposure rule)"
+            return {"structure": name, "suggested_psi": final,
+                    "mpa_equiv": round(final * 0.006895, 1),
+                    "reason": reason + extra}
+    return {"structure": "general structural", "suggested_psi": 3000,
+            "mpa_equiv": round(3000 * 0.006895, 1),
+            "reason": "Default structural grade when structure type is unclear"}
+
 def _wc_for_strength(psi):
     for target, wc in STRENGTH_WC:
         if psi >= target:
