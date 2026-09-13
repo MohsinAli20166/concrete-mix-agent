@@ -1,6 +1,6 @@
 import os, json
 import streamlit as st
-from mix_design_tool import calculate_mix_design, EXPOSURE_RULES, M3_TO_CFT
+from mix_design_tool import calculate_mix_design, EXPOSURE_RULES, STRUCTURE_RULES, suggest_grade, M3_TO_CFT
 
 BAG_CFT = 1.25   # site convention: 1 bag of 50 kg cement = 1.25 cft
 
@@ -107,8 +107,12 @@ with st.sidebar:
     st.header("🧮 Manual Calculator / دستی کیلکولیٹر")
     psi = st.number_input("Target strength (psi)", 1500, 8000, 3000, step=500)
     exp = st.selectbox("Exposure", list(EXPOSURE_RULES.keys()), key="sb_exp")
+    struct_sel = st.selectbox("Structure type / ساخت کی قسم", [r[0] for r in STRUCTURE_RULES], key="sb_struct")
     if st.button("Calculate mix / مکس نکالیں", type="primary"):
         res = calculate_mix_design(psi, exp)
+        sugg = suggest_grade(struct_sel, exp)
+        st.info(f"💡 **Suggested grade / تجویز کردہ گریڈ:** {sugg['suggested_psi']} psi (≈{sugg['mpa_equiv']} MPa) "
+                f"for {sugg['structure']} — {sugg['reason']}")
         show_result({"target_strength_psi": psi, "exposure": exp}, res,
                     _explain(res, lang), "Manual tool mode", lang)
     st.divider()
@@ -152,9 +156,13 @@ if st.button("Run Agent / ایجنٹ چلائیں", type="primary") and prompt.s
     with st.spinner("Agent is reading your scenario and deciding whether to call the tool..."):
         try:
             if os.environ.get("ANTHROPIC_API_KEY"):
-                show_result(*agent_run_llm(prompt, lang), lang)
+                args, result, explanation, mode = agent_run_llm(prompt, lang)
             else:
-                show_result(*agent_run_fallback(prompt, lang), lang)
+                args, result, explanation, mode = agent_run_fallback(prompt, lang)
         except Exception as e:
             st.warning(f"LLM unavailable ({type(e).__name__}) — switching to offline fallback agent.")
-            show_result(*agent_run_fallback(prompt, lang), lang)
+            args, result, explanation, mode = agent_run_fallback(prompt, lang)
+        sugg = suggest_grade(prompt, args["exposure"])
+        st.info(f"💡 **Suggested grade / تجویز کردہ گریڈ:** {sugg['suggested_psi']} psi (≈{sugg['mpa_equiv']} MPa) "
+                f"for {sugg['structure']} — {sugg['reason']}")
+        show_result(args, result, explanation, mode, lang)
