@@ -2,24 +2,22 @@
 
 **PakAngel GenAI & Agentic AI Cohort C11 Hackathon Project**
 
-ConcreteAI is an agentic AI assistant that automates preliminary concrete mix design calculations per **ACI 211.1 / ACI 318** (as referenced by the **Pakistan Building Code 2021**).
-
-Instead of hallucinating engineering data, the LLM agent reads a plain-English site scenario, infers the required strength (psi) and exposure class, and **calls a deterministic calculation tool**. It then generates a clear, code-compliant explanation in **English, Urdu (اردو), or Roman Urdu**.
+ConcreteAI is an agentic AI assistant that automates preliminary concrete mix design per ACI 211.1 / ACI 318 (Pakistan Building Code 2021). The LLM agent reads a plain-English site scenario, infers strength (psi) and exposure class, calls a deterministic calculation tool, and explains the compliant mix in English, Urdu (اردو), or Roman Urdu.
 
 ## 🚀 Key Features
-*   **Agentic Chat:** Real tool-calling via LLM (Anthropic Claude) + offline keyword fallback agent.
-*   **Deterministic Tool:** 100% accurate ACI 211.1 absolute-volume calculations (no AI guessing).
-*   **Durability Overrides:** Automatic warnings when ACI 318 exposure rules override user-requested strength.
-*   **Multilingual:** Explanations available in English, Urdu (اردو), and Roman Urdu so local contractors can use it directly.
-*   **Manual Calculator:** Sidebar tool for quick, deterministic lookups.
+- Agentic chat: real LLM tool-calling (Anthropic Claude) + offline keyword fallback
+- Deterministic ACI 211.1 absolute-volume calculator (no AI-guessed numbers)
+- Durability override warnings (ACI 318 / PBC 2021)
+- Multilingual explanations: English, Urdu, Roman Urdu for local contractors
+- Manual calculator sidebar
 
 ## ⚙️ Tech Stack
-*   Python
-*   Streamlit (UI & Deployment)
-*   Anthropic Claude (Agentic Tool-Calling)
-*   ACI 211.1 Mathematical Logic
+Python · Streamlit · Anthropic Claude · ACI 211.1 calculation module
 
 ## 🖥️ Run Locally
-```bash
-pip install -r requirements.txt
-streamlit run app.py
+Install: pip install -r requirements.txt  —  then run: streamlit run app.py
+
+## ⚠️ Limitations
+- Prototype for preliminary estimation and trial batches only
+- Fixed material assumptions (20 mm aggregate, 75–100 mm slump, FM 2.8 sand)
+- Not a final design: lab trials and engineer sign-off required
